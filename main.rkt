@@ -9,8 +9,6 @@
   (only-in json
            jsexpr->string
            string->jsexpr)
-  (only-in racket/file
-           file->string)
   (only-in racket/string
            string-join
            string-trim)
@@ -25,7 +23,7 @@
  org
  staff
  students
- token-file
+ token
  sep
  ;; GitHub API
  list-org-repos
@@ -47,11 +45,13 @@
 
 ;; Library parameters
 (define host (make-parameter "github.com"))
+(define api-path (make-parameter "/api/v3"))
+(define token (make-parameter "token"))
 (define org (make-parameter "org"))
 (define staff (make-parameter "staff"))
 (define students (make-parameter "students"))
-(define token-file (make-parameter "TOKEN"))
 (define sep (make-parameter "-"))
+(define verbose? (make-parameter #f))
 
 
 ;; Helpers ;;
@@ -59,10 +59,6 @@
 ;; diff : (listof any) (listof any) -> (listof any)
 (define (diff include exclude)
   (filter (λ (elem) (not (member elem exclude))) include))
-
-;; token : -> string?
-(define (token)
-  (string-trim (file->string (token-file)) #:repeat? #t))
 
 ;; headers : -> string?
 (define (headers)
@@ -88,10 +84,10 @@
 ;; with data in jsexpr? form and return the jsexpr? response.
 ;; The URI MUST begin with a forward slash.
 ;; If #:v? #t is provided, also display the response status.
-(define (make-request method uri data [verbose? #f])
+(define (make-request method uri data)
   (define-values (status _ in)
     (http-sendrecv (host)
-                   (format "/api/v3~a" uri)
+                   (format "~a~a" (api-path) uri)
                    #:ssl? #t
                    #:method method
                    #:headers (headers)
@@ -103,13 +99,13 @@
 ;; Make GET requests to all pages, collecting jsexpr? responses.
 ;; Assume that responses are lists.
 ;; Other preconditions apply as make-request above.
-(define (get-request uri [verbose? #f])
+(define (get-request uri)
   (define hc (http-conn-open (host) #:ssl? #t #:auto-reconnect? #t))
   (let loop ([response '()]
              [page 1])
     (define-values (status _ in)
       (http-conn-sendrecv! hc
-                           (format "/api/v3~a?page=~a" uri page)
+                           (format "~a~a?page=~a" (api-path) uri page)
                            #:method "GET"
                            #:headers (headers)))
     (define response-more (get-response in))
@@ -120,23 +116,23 @@
 
 ;; post-request : string? jsexpr? -> jsexpr?
 ;; Make a POST request
-(define (post-request uri data [verbose? #f])
-  (make-request "POST" uri data verbose?))
+(define (post-request uri data)
+  (make-request "POST" uri data))
 
 ;; put-request : string? jsexpr? -> jsexpr?
 ;; Make a PUT request
-(define (put-request uri data [verbose? #f])
-  (make-request "PUT" uri data verbose?))
+(define (put-request uri data)
+  (make-request "PUT" uri data))
 
 ;; patch-request : string? -> jsexpr?
 ;; Make a PATCH request
-(define (patch-request uri data [verbose? #f])
-  (make-request "PATCH" uri data verbose?))
+(define (patch-request uri data)
+  (make-request "PATCH" uri data))
 
 ;; delete-request : string? -> jsexpr?
 ;; Make a DELETE request
-(define (delete-request uri [verbose? #f])
-  (make-request "DELETE" uri #f verbose?))
+(define (delete-request uri)
+  (make-request "DELETE" uri #f))
 
 
 ;; GitHub API ;;
@@ -146,64 +142,64 @@
 ;; Organizations
 
 ;; list-org-repos : jsexpr?
-;; https://docs.github.com/en/enterprise-server/rest/reference/repos#list-organization-repositories
-(define (list-org-repos #:v? [verbose? #f])
-  (for/list ([repo (get-request (format "/orgs/~a/repos" (org)) verbose?)])
+;; https://docs.github.com/rest/reference/repos#list-organization-repositories
+(define (list-org-repos)
+  (for/list ([repo (get-request (format "/orgs/~a/repos" (org)))])
     (hash-ref repo 'name)))
 
 ;; Teams
 
 ;; list-org-teams : jsexpr?
-;; https://docs.github.com/en/enterprise-server/rest/reference/teams#list-teams
-(define (list-org-teams #:v? [verbose? #f])
-  (get-request (format "/orgs/~a/teams" (org)) verbose?))
+;; https://docs.github.com/rest/reference/teams#list-teams
+(define (list-org-teams)
+  (get-request (format "/orgs/~a/teams" (org))))
 
 ;; list-team-members : string? -> jsexpr?
-;; https://docs.github.com/en/enterprise-server/rest/reference/teams#list-team-members
-(define (list-team-members team #:v? [verbose? #f])
-  (get-request (format "/orgs/~a/teams/~a/members" (org) team) verbose?))
+;; https://docs.github.com/rest/reference/teams#list-team-members
+(define (list-team-members team)
+  (get-request (format "/orgs/~a/teams/~a/members" (org) team)))
 
 ;; list-team-logins : string? -> (listof string?)
 ;; List the login names for each member in the team
-(define (list-team-logins team #:v? [verbose? #f])
-  (for/list ([member (list-team-members team #:v? verbose?)])
+(define (list-team-logins team)
+  (for/list ([member (list-team-members team)])
     (hash-ref member 'login)))
 
 ;; add-repo-team : string? string? (#:permission permission?) -> jsexpr?
-;; https://docs.github.com/en/enterprise-server/rest/reference/teams#add-or-update-team-repository-permissions
-(define (add-repo-team team repo #:permission permission #:v? [verbose? #f])
+;; https://docs.github.com/rest/reference/teams#add-or-update-team-repository-permissions
+(define (add-repo-team team repo #:permission permission)
   (put-request (format "/orgs/~a/teams/~a/repos/~a/~a" (org) team (org) repo)
-               (hash 'permission permission) verbose?))
+               (hash 'permission permission)))
 
 ;; Repositories
 
 ;; create-org-repo : string? string? [boolean?] -> jsexpr?
-;; https://docs.github.com/en/enterprise-server/rest/reference/repos#create-an-organization-repository
-(define (create-org-repo repo desc [private? #t] #:v? [verbose? #f])
+;; https://docs.github.com/rest/reference/repos#create-an-organization-repository
+(define (create-org-repo repo desc [private? #t])
   (post-request (format "/orgs/~a/repos" (org))
-                (hash 'name repo 'description desc 'private private?) verbose?))
+                (hash 'name repo 'description desc 'private private?)))
 
 ;; set-default-branch : string? string? -> jsexpr?
-;; https://docs.github.com/en/enterprise-server/rest/reference/repos#edit
+;; https://docs.github.com/rest/reference/repos#update-a-repository
 (define (set-default-branch repo branch)
   (patch-request (format "/repos/~a/~a" org repo)
                  (hash 'default_branch branch)))
 
 ;; add-repo-collab : string? string? (#:permission permission?) -> jsexpr?
-;; https://docs.github.com/en/enterprise-server/rest/reference/repos#add-a-repository-collaborator
-(define (add-repo-collab repo username #:permission permission #:v? [verbose? #f])
+;; https://docs.github.com/rest/reference/repos#add-a-repository-collaborator
+(define (add-repo-collab repo username #:permission permission)
   (put-request (format "/repos/~a/~a/collaborators/~a" (org) repo username)
-               (hash 'permission permission) verbose?))
+               (hash 'permission permission)))
 
 ;; remove-repo-collab : string? string? -> jsexpr?
-;; https://docs.github.com/en/enterprise-server/rest/reference/repos#remove-a-repository-collaborator
-(define (remove-repo-collab repo username #:v? [verbose? #f])
-  (delete-request (format "/repos/~a/~a/collaborators/~a" (org) repo username) verbose?))
+;; https://docs.github.com/rest/reference/repos#remove-a-repository-collaborator
+(define (remove-repo-collab repo username)
+  (delete-request (format "/repos/~a/~a/collaborators/~a" (org) repo username)))
 
 ;; delete-repo : string? -> jsexpr?
-;; https://docs.github.com/en/enterprise-server/rest/reference/repos#delete-a-repository
-(define (delete-repo repo #:v? [verbose? #f])
-  (delete-request (format "/repos/~a/~a" (org) repo) verbose?))
+;; https://docs.github.com/rest/reference/repos#delete-a-repository
+(define (delete-repo repo)
+  (delete-request (format "/repos/~a/~a" (org) repo)))
 
 
 ;; Scripts ;;

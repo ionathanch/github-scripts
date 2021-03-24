@@ -11,14 +11,27 @@ This package contains a teeny tiny interface to GitHub Enterprise's API and a co
 The scripts are designed to help a course @racket[staff] team administer individual student repositories,
 all of whom belong to a @racket[students] team.
 
+To use the API, at least the @racket[host], @racket[api-path], @racket[token], and @racket[org] parameters must be set.
+The @racket[staff] and @racket[students] parameters are required for the scripts.
+
 @section{Parameters}
 
-@defparam[host host-uri string? #:value "github.com"]{
- The URI of the GitHub instance.
+@defparam[host host string? #:value "github.com"]{
+ The hostname of the GitHub instance.
+}
+
+@defparam[api-path path string? #:value "/api/v3"]{
+ The path to the API endpoint of the GitHub instance.
+ For Enterprise instances, this is usually the default value.
+}
+
+@defparam[token token string? #:value "token"]{
+ The OAuth token for authorizing HTTP requests.
 }
 
 @defparam[org org-name string? #:value "org"]{
  The organization name.
+ For respository requests not specific to organizations, this can be the repository owner.
 }
 
 @defparam[staff team-name string? #:value "staff"]{
@@ -29,96 +42,88 @@ all of whom belong to a @racket[students] team.
  The name of the students team.
 }
 
-@defparam[token-file file-name string? #:value "TOKEN"]{
- The path of the file where the OAuth token is stored.
-}
-
 @defparam[sep separator string? #:value "-"]{
  When student repositories are created, the prefix and the suffix will be separated by this separator.
 }
 
-@section{API}
+@defparam[verbose? verbosity (or/c exact-positive-integer? #f) #:value #f]{
+ If not @racket[#f], every HTTP response status will be displayed.
+ (In the future, different positive integral values may correspond to different levels of verbosity.)
+}
 
-When @racket[verbose?] is not @racket[#f], all HTTP request statuses will be displayed.
+@section{API}
 
 @subsection{Organizations}
 
-@defproc[(list-org-repos [#:v? verbose? any/c #f]) jsexpr?]{
+@defproc[(list-org-repos) jsexpr?]{
  List the repositories in the organization.
  For details on the response content, see
- @url["https://docs.github.com/en/enterprise-server/rest/reference/repos#list-organization-repositories"].
+ @url["https://docs.github.com/rest/reference/repos#list-organization-repositories"].
 }
 
 @subsection{Teams}
 
-@defproc[(list-org-teams [#:v? verbose? any/c #f]) jsexpr?]{
+@defproc[(list-org-teams) jsexpr?]{
  List the teams in the organization.
  For details on the response content, see
- @url["https://docs.github.com/en/enterprise-server/rest/reference/teams#list-teams"].
+ @url["https://docs.github.com/rest/reference/teams#list-teams"].
 }
 
-@defproc[(list-team-members [team string?]
-                            [#:v? verbose? any/c #f]) jsexpr?]{
+@defproc[(list-team-members [team string?]) jsexpr?]{
  List the members of the given @racket[team].
  For details on the response content, see
- @url["https://docs.github.com/en/enterprise-server/rest/reference/teams#list-team-members"].
+ @url["https://docs.github.com/rest/reference/teams#list-team-members"].
 }
 
-@defproc[(list-team-logins [team string?]
-                           [#:v? verbose any/c #f]) (listof string?)]{
+@defproc[(list-team-logins [team string?]) (listof string?)]{
  List the login usernames of the members of the given @racket[team].
 }
 
 @defproc[(add-repo-team [team string?]
                         [repository string?]
-                        [#:permission permission (or/c "push" "pull" "admin")]
-                        [#:v? verbose? any/c #f]) jsexpr?]{
+                        [#:permission permission (or/c "push" "pull" "admin")]) jsexpr?]{
  Add the @racket[team] with @racket[permission] to the @racket[repository].
  For details on the response content, see
- @url["https://docs.github.com/en/enterprise-server/rest/reference/teams#add-or-update-team-repository-permissions"].
+ @url["https://docs.github.com/rest/reference/teams#add-or-update-team-repository-permissions"].
 }
 
 @subsection{Repositories}
 
 @defproc[(create-org-repo [repository string?]
                           [description string?]
-                          [private boolean? #t]
-                          [#:v? verbose? any/c #f]) jsexpr?]{
+                          [private boolean? #t]) jsexpr?]{
  Create a new repository with the given @racket[repository] name and @racket[description].
  The repository is private by default.
  For details on the response content, see
- @url["https://docs.github.com/en/enterprise-server/rest/reference/repos#create-an-organization-repository"].
+ @url["https://docs.github.com/rest/reference/repos#create-an-organization-repository"].
 }
 
 @defproc[(set-default-branch [repository string?]
                              [branch string?]) jsexpr?]{
  Set the default branch of @racket[repository] to @racket[branch].
  For details on the response content, see
- @url["https://docs.github.com/en/enterprise-server/rest/reference/repos#edit"].
+ @url["https://docs.github.com/rest/reference/repos#update-a-repository"].
 }
 
 @defproc[(add-repo-collab [repository string?]
                           [username string?]
-                          [#:permission permission (or/c "push" "pull" "admin")]
-                          [#:v? verbose? any/c #f]) jsexpr?]{
+                          [#:permission permission (or/c "push" "pull" "admin")]) jsexpr?]{
  Add the given user as a collaborator to the @racket[repository] with @racket[permission].
  For details on the response content, see
- @url["https://docs.github.com/en/enterprise-server/rest/reference/repos#add-a-repository-collaborator"].
+ @url["https://docs.github.com/rest/reference/repos#add-a-repository-collaborator"].
 }
 
 @defproc[(remove-repo-collab [repository string?]
-                             [username string?]
-                             [#:v? verbose? any/c #f]) jsexpr?]{
+                             [username string?]) jsexpr?]{
  Remove the given user as a collaborator from the @racket[repository].
  For details on the response content, see
- @url["https://docs.github.com/en/enterprise-server/rest/reference/repos#remove-a-repository-collaborator"].
+ @url["https://docs.github.com/rest/reference/repos#remove-a-repository-collaborator"].
 }
 
-@defproc[(delete-repo [repository string?]
-                      [#:v? verbose? any/c #f]) jsexpr?]{
+@defproc[(delete-repo [repository string?]) jsexpr?]{
  Delete the given @racket[repository].
  For details on the response content, see
- @url["https://docs.github.com/en/enterprise-server/rest/reference/repos#delete-a-repository"].
+ @url["https://docs.github.com/rest/reference/repos#delete-a-repository"].
 }
 
 @section{Scripts}
