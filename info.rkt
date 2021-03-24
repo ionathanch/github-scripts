@@ -5,4 +5,4 @@
 (define scribblings '(("scribblings/github-scripts.scrbl" ())))
 (define pkg-desc "")
 (define version "0.1")
-(define pkg-authors '(ionathanch))
+(define pkg-authors '(Jonathan Chan))

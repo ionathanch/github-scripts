@@ -220,7 +220,7 @@
 ;; add-student-collab : string? permission? [#:logins (listof string?)] [#:except (listof string?)] -> void?
 ;; For each student repository with the given prefix,
 ;; add student as collaborator with given permissions,
-;; unless their CWL is in the exceptions list.
+;; unless their login is in the exceptions list.
 ;; Precondition: The student repositories must exist.
 (define (add-student-collab prefix permission #:logins [logins (list-team-logins (students))] #:except [except '()])
   (unless (member permission permissions)
@@ -235,7 +235,7 @@
 ;; remove-student-collab : string? [#:logins (listof string?)] [#:except (listof string?)] -> void?
 ;; For each student repository with the given prefix,
 ;; remove student from the repository as collaborator,
-;; unless their CWL is in the exceptions list.
+;; unless their login is in the exceptions list.
 ;; Precondition: I think the student has to be a collaborator in that repo.
 (define (remove-student-collab prefix #:logins [logins (list-team-logins (students))] #:except [except '()])
   (for ([login (diff logins except)])
@@ -245,12 +245,11 @@
 
 ;; push-student-repos : string? string? [boolean?] [#:logins (listof string?)] [#:except (listof string?)] -> void?
 ;; For each student repository with the given prefix,
-;; unless their CWL is in the exceptions list,
+;; unless their login is in the exceptions list,
 ;; push from the given directory,
 ;; adding the repository as a new remote if specified.
 ;; Precondition: Repositories and directory must exist,
 ;; and there must be the right Git repo in that directory.
-;; (It appears even administrators cannot force-push.)
 (define (push-student-repos prefix dir [add-remotes? #f] #:logins [logins (list-team-logins (students))] #:except [except '()])
   (printf "Pushing from ~a.\n" dir)
   (for ([login (diff logins except)])
@@ -267,7 +266,7 @@
 
 ;; clone-student-repos : string? string? [boolean?] [#:logins (listof string?)] [#:except (listof string?)] -> void?
 ;; For each student repository with the given prefix,
-;; unless their CWL is in the exceptions list,
+;; unless their login is in the exceptions list,
 ;; clone it to the given directory,
 ;; creating the directory and initializing a Git repo there if specified.
 ;; Precondition: The student repositories must exist.
