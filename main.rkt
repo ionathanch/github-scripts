@@ -128,6 +128,11 @@
 (define (put-request uri data [verbose? #f])
   (make-request "PUT" uri data verbose?))
 
+;; patch-request : string? -> jsexpr?
+;; Make a PATCH request
+(define (patch-request uri data [verbose? #f])
+  (make-request "PATCH" uri data verbose?))
+
 ;; delete-request : string? -> jsexpr?
 ;; Make a DELETE request
 (define (delete-request uri [verbose? #f])
@@ -178,6 +183,12 @@
   (post-request (format "/orgs/~a/repos" (org))
                 (hash 'name repo 'description desc 'private private?) verbose?))
 
+;; set-default-branch : string? string? -> jsexpr?
+;; https://docs.github.com/en/enterprise-server/rest/reference/repos#edit
+(define (set-default-branch repo branch)
+  (patch-request (format "/repos/~a/~a" org repo)
+                 (hash 'default_branch branch)))
+
 ;; add-repo-collab : string? string? (#:permission permission?) -> jsexpr?
 ;; https://docs.github.com/en/enterprise-server/rest/reference/repos#add-a-repository-collaborator
 (define (add-repo-collab repo username #:permission permission #:v? [verbose? #f])
@@ -198,8 +209,8 @@
 ;; Scripts ;;
 
 ;; create-student-repos : string? string? -> void?
-;; Create repos for each student with the given prefix and with student logins as suffix,
-;; and with the given repo description.
+;; Create repositories for each student with the given prefix and with student logins as suffix,
+;; and with the given repository description.
 ;; The staff team will be administrators of each repo.
 (define (create-student-repos prefix desc)
   (for ([login (list-team-logins (students))])
@@ -207,6 +218,14 @@
     (printf "Creating repository ~a.\n" repo)
     (create-org-repo repo desc)
     (add-repo-team (staff) repo #:permission "admin")))
+
+;; update-student-repos-default-branch : string? string? -> void?
+;; For each student repository with the given prefix,
+;; set the default branch to the given branch.
+(define (update-student-repos-default-branch prefix branch)
+  (for ([login (list-team-logins (students))])
+    (define repo (string-join (list prefix login) sep))
+    (set-default-branch repo branch)))
 
 ;; delete-student-repos : string? -> void?
 ;; Delete all student repositories with the given prefix.
