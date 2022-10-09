@@ -135,6 +135,19 @@
   (make-request "DELETE" uri #f))
 
 
+;; Gradescope API ;;
+
+;; login : string? string? -> string?
+(define (login email password)
+  (define response
+    (parameterize ([host "www.gradescope.ca"]
+                   [api-path "/api/v1"])
+      (post-request "/user_session"
+                    (hash 'email email
+                          'password password))))
+  (hash-ref response 'token))
+
+
 ;; GitHub API ;;
 
 (define permissions '("push" "pull" "admin"))
